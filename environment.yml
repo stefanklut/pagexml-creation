@@ -1,0 +1,8 @@
+name: pagexml-creation
+channels:
+  - conda-forge
+dependencies:
+  - python=3
+  - imagesize
+  - tqdm
+  - opencv
