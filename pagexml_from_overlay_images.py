@@ -132,7 +132,7 @@ class Creator:
                         [0, 0],
                         [0, scaled_foreground_height],
                         [scaled_foreground_width, 0],
-                        [scaled_foreground_width, scaled_foreground_width],
+                        [scaled_foreground_width, scaled_foreground_height],
                     ]
                 ],
                 dtype=np.float32,
@@ -141,8 +141,8 @@ class Creator:
         )
         corners = corners.squeeze().astype(int)
 
-        # for corner in corners:
-        #     image = cv2.circle(image_result, corner, 5, (255, 0, 0), -1)
+        for corner in corners:
+            image = cv2.circle(image_result, corner, 5, (255, 0, 0), -1)
 
         if np.any(np.logical_or(0 > corners[:, 0], corners[:, 0] > background_width)) or np.any(
             np.logical_or(0 > corners[:, 1], corners[:, 1] > background_height)
