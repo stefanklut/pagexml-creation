@@ -10,51 +10,43 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from utils.input_utils import clean_input_paths, get_file_paths
+from utils.input_utils import get_file_paths, supported_image_formats
 from utils.logging_utils import get_logger_name
 
 
 class Creator:
-    def __init__(self, input_paths=None, output_dir=None, copy=False) -> None:
+    def __init__(
+        self,
+        foreground_paths=None,
+        background_paths=None,
+        output_dir=None,
+        number=None,
+        copy=False,
+    ) -> None:
         self.logger = logging.getLogger(get_logger_name())
 
-        self.input_paths: Optional[Sequence[Path]] = None
-        if input_paths is not None:
-            self.set_input_paths(input_paths)
+        self.foreground_paths: Optional[Sequence[Path]] = None
+        if foreground_paths is not None:
+            self.set_foreground_paths(foreground_paths)
+
+        self.background_paths: Optional[Sequence[Path]] = None
+        if background_paths is not None:
+            self.set_background_paths(background_paths)
 
         self.output_dir: Optional[Path] = None
         if output_dir is not None:
             self.set_output_dir(output_dir)
 
+        self._random_foreground_paths = []
+        self._random_background_paths = []
+
+        self.number = number
+
         self.copy = copy
 
-        self.image_formats = [
-            ".bmp",
-            ".dib",
-            ".jpeg",
-            ".jpg",
-            ".jpe",
-            ".jp2",
-            ".png",
-            ".webp",
-            ".pbm",
-            ".pgm",
-            ".ppm",
-            ".pxm",
-            ".pnm",
-            ".pfm",
-            ".sr",
-            ".ras",
-            ".tiff",
-            ".tif",
-            ".exr",
-            ".hdr",
-            ".pic",
-        ]
-
-    def set_input_paths(
+    def set_foreground_paths(
         self,
-        input_paths: str | Path | Sequence[str | Path],
+        foreground_paths: str | Path | Sequence[str | Path],
     ) -> None:
         """
         Setter for image paths, also cleans them to be a list of Paths
@@ -66,21 +58,23 @@ class Creator:
             FileNotFoundError: input path not found on the filesystem
             PermissionError: input path not accessible
         """
-        input_paths = clean_input_paths(input_paths)
+        self.foreground_paths = get_file_paths(foreground_paths, supported_image_formats)
 
-        all_input_paths = []
+    def set_background_paths(
+        self,
+        background_paths: str | Path | Sequence[str | Path],
+    ) -> None:
+        """
+        Setter for image paths, also cleans them to be a list of Paths
 
-        for input_path in input_paths:
-            if not input_path.exists():
-                raise FileNotFoundError(f"Input ({input_path}) is not found")
+        Args:
+            input_paths (str | Path | Sequence[str | Path]): path(s) from which to extract the images
 
-            if not os.access(path=input_path, mode=os.R_OK):
-                raise PermissionError(f"No access to {input_path} for read operations")
-
-            input_path = input_path.resolve()
-            all_input_paths.append(input_path)
-
-        self.input_paths = all_input_paths
+        Raises:
+            FileNotFoundError: input path not found on the filesystem
+            PermissionError: input path not accessible
+        """
+        self.background_paths = get_file_paths(background_paths, supported_image_formats)
 
     def set_output_dir(self, output_dir: str | Path) -> None:
         """
@@ -98,10 +92,20 @@ class Creator:
 
         self.output_dir = output_dir.resolve()
 
-    def overlay_images_random_transform(self, foreground_path, background_path):
-        foreground_image = cv2.imread(foreground_path)
-        background_image = cv2.imread(background_path)
+    @staticmethod
+    def within_rectangle(points, rectangle):
+        if np.any(rectangle[0, 0] > corners[:, 0]):
+            return False
+        if np.any(corners[:, 0] > rectangle[1, 0]):
+            return False
+        if np.any(rectangle[0, 1] > corners[:, 1]):
+            return False
+        if np.any(corners[:, 1] > rectangle[1, 1]):
+            return False
 
+        return True
+
+    def overlay_images_random_transform(self, foreground_image: np.ndarray, background_image: np.ndarray):
         foreground_height, foreground_width = foreground_image.shape[:2]
         background_height, background_width = background_image.shape[:2]
 
@@ -155,14 +159,40 @@ class Creator:
 
         return corners
 
-    def create_page(self, image):
-        pass
+    def random_foreground_path(self):
+        if self.foreground_paths is None:
+            raise TypeError("Cannot run when the foreground_paths is None")
+
+        if len(self._random_foreground_paths) == 0:
+            self._random_foreground_paths.extend(self.foreground_paths)
+            random.shuffle(self._random_foreground_paths)
+        return self._random_foreground_paths.pop()
+
+    def random_background_path(self):
+        if self.background_paths is None:
+            raise TypeError("Cannot run when the foreground_paths is None")
+
+        if len(self._random_background_paths) == 0:
+            self._random_background_paths.extend(self.background_paths)
+            random.shuffle(self._random_background_paths)
+        return self._random_background_paths.pop()
+
+    def create_page(self, i):
+        foreground_image = cv2.imread(foreground_path)
+        background_image = cv2.imread(background_path)
 
     def process(self):
-        if self.input_paths is None:
-            raise TypeError("Cannot run when the input_paths is None")
+        if self.foreground_paths is None:
+            raise TypeError("Cannot run when the foreground_paths is None")
 
-        image_paths = get_file_paths(self.input_paths, self.image_formats)
+        if self.background_paths is None:
+            raise TypeError("Cannot run when the background_paths is None")
+
+        if self.output_dir is None:
+            raise TypeError("Cannot run when the output_dir is None")
+
+        if self.number is None:
+            raise TypeError("Cannot run when the number is None")
 
         # Single threaded
         # for image_path in tqdm(image_paths):
@@ -170,13 +200,15 @@ class Creator:
 
         # Multi threading
         with Pool(os.cpu_count()) as pool:
-            _ = list(tqdm(pool.imap_unordered(self.create_page, image_paths), total=len(image_paths)))
+            _ = list(tqdm(pool.imap_unordered(self.create_page, range(self.number)), total=len(self.number)))
 
 
 def main(args: argparse.Namespace):
     creator = Creator(
-        input_paths=args.input,
+        foreground_paths=args.foreground,
+        background_paths=args.background,
         output_dir=args.output,
+        number=args.number,
         copy=args.copy,
     )
     creator.process()

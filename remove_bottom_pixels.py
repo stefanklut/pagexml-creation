@@ -8,11 +8,8 @@ from typing import Optional, Sequence
 import cv2
 from tqdm import tqdm
 
-from page_xml.xmlPAGE import PageData
-from utils.copy_utils import copy_mode
-from utils.input_utils import clean_input_paths, get_file_paths
+from utils.input_utils import get_file_paths, supported_image_formats
 from utils.logging_utils import get_logger_name
-from utils.path_utils import image_path_to_xml_path
 
 
 def get_arguments() -> argparse.Namespace:
@@ -22,15 +19,13 @@ def get_arguments() -> argparse.Namespace:
     io_args.add_argument("-i", "--input", help="Input folder/file", nargs="+", action="extend", type=str, required=True)
     io_args.add_argument("-o", "--output", help="Output folder", type=str, required=True)
 
-    parser.add_argument("--copy", action="store_true", help="copy files over to output folder")
-
     args = parser.parse_args()
 
     return args
 
 
 class Creator:
-    def __init__(self, input_paths=None, output_dir=None, copy=False) -> None:
+    def __init__(self, input_paths=None, output_dir=None) -> None:
         self.logger = logging.getLogger(get_logger_name())
 
         self.input_paths: Optional[Sequence[Path]] = None
@@ -40,32 +35,6 @@ class Creator:
         self.output_dir: Optional[Path] = None
         if output_dir is not None:
             self.set_output_dir(output_dir)
-
-        self.copy = copy
-
-        self.image_formats = [
-            ".bmp",
-            ".dib",
-            ".jpeg",
-            ".jpg",
-            ".jpe",
-            ".jp2",
-            ".png",
-            ".webp",
-            ".pbm",
-            ".pgm",
-            ".ppm",
-            ".pxm",
-            ".pnm",
-            ".pfm",
-            ".sr",
-            ".ras",
-            ".tiff",
-            ".tif",
-            ".exr",
-            ".hdr",
-            ".pic",
-        ]
 
     def set_input_paths(
         self,
@@ -81,21 +50,7 @@ class Creator:
             FileNotFoundError: input path not found on the filesystem
             PermissionError: input path not accessible
         """
-        input_paths = clean_input_paths(input_paths)
-
-        all_input_paths = []
-
-        for input_path in input_paths:
-            if not input_path.exists():
-                raise FileNotFoundError(f"Input ({input_path}) is not found")
-
-            if not os.access(path=input_path, mode=os.R_OK):
-                raise PermissionError(f"No access to {input_path} for read operations")
-
-            input_path = input_path.resolve()
-            all_input_paths.append(input_path)
-
-        self.input_paths = all_input_paths
+        self.input_paths = get_file_paths(input_paths, supported_image_formats)
 
     # TODO Set multiple output paths
     def set_output_dir(self, output_dir: str | Path) -> None:
@@ -126,22 +81,19 @@ class Creator:
         if self.input_paths is None:
             raise TypeError("Cannot run when the input_paths is None")
 
-        image_paths = get_file_paths(self.input_paths, self.image_formats)
-
         # Single threaded
         # for image_path in tqdm(image_paths):
         #     remove_bottom_pixels(image_path)
 
         # Multi threading
         with Pool(os.cpu_count()) as pool:
-            _ = list(tqdm(pool.imap_unordered(self.remove_bottom_pixels, image_paths), total=len(image_paths)))
+            _ = list(tqdm(pool.imap_unordered(self.remove_bottom_pixels, self.input_paths), total=len(self.input_paths)))
 
 
 def main(args: argparse.Namespace):
     creator = Creator(
         input_paths=args.input,
         output_dir=args.output,
-        copy=args.copy,
     )
     creator.process()
 
