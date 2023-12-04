@@ -90,7 +90,7 @@ class Creator:
             raise TypeError("Output dir is None")
         image_output_path = self.output_dir.joinpath(image_path.name)
 
-        copy_mode(image_path, image_output_path, mode="symlink")
+        copy_mode(image_path, image_output_path, mode="link")
 
     def generate_empty_page_xml(self, image_path):
         if self.output_dir is None:
