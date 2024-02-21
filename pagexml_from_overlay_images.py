@@ -31,6 +31,8 @@ def get_arguments() -> argparse.Namespace:
 
     parser.add_argument("-n", "--number", type=int, help="Number of images generated")
 
+    parser.add_argument("--max_images_per_page", type=int, default=1, help="Number of images per page")
+
     args = parser.parse_args()
 
     return args
@@ -43,6 +45,7 @@ class Creator:
         background_paths=None,
         output_dir=None,
         number=None,
+        max_images_per_page=1,
         copy=False,
     ) -> None:
         self.logger = logging.getLogger(get_logger_name())
@@ -63,6 +66,9 @@ class Creator:
         self._random_background_paths = []
 
         self.number = number
+
+        self.max_images_per_page = max_images_per_page
+        assert self.max_images_per_page > 0
 
         self.copy = copy
 
@@ -132,7 +138,7 @@ class Creator:
         background_height, background_width = background_image.shape[:2]
 
         max_scale_factor = min([background_height / foreground_height, background_width / foreground_width])
-        scale_factor = np.random.uniform(max_scale_factor * 0.25, max_scale_factor)
+        scale_factor = np.random.uniform(max_scale_factor * 0.1, max_scale_factor)
         scaled_foreground_image = cv2.resize(foreground_image, None, fx=scale_factor, fy=scale_factor)
         scaled_foreground_height, scaled_foreground_width = scaled_foreground_image.shape[:2]
 
@@ -201,40 +207,40 @@ class Creator:
     def create_page(self, items):
         if self.output_dir is None:
             raise TypeError("Cannot run when the output_dir is None")
-        foreground_path, background_path, i = items
-        foreground_image = cv2.imread(str(foreground_path))
-
+        foreground_paths, background_path, i = items
         background_image = cv2.imread(str(background_path))
 
-        image, corners = self.overlay_images_random_transform(foreground_image, background_image)
+        for foreground_path in foreground_paths:
+            foreground_image = cv2.imread(str(foreground_path))
 
-        image_path = self.output_dir.joinpath(f"{i}.jpg")
+            image, corners = self.overlay_images_random_transform(foreground_image, background_image)
+
+            image_path = self.output_dir.joinpath(f"{i}.jpg")
+
+            page_dir = self.output_dir.joinpath("page")
+
+            if not page_dir.is_dir():
+                self.logger.info(f"Could not find page dir ({page_dir}), creating one at specified location")
+                page_dir.mkdir(parents=True)
+
+            xml_path = image_path_to_xml_path(image_path, check=False)
+
+            page = PageData(xml_path)
+            page.new_page(image_path.name, str(image.shape[0]), str(image.shape[1]))
+
+            region_coords = ""
+            for coords in corners.reshape(-1, 2):
+                region_coords = region_coords + f" {coords[0]},{coords[1]}"
+            region_coords = region_coords.strip()
+
+            region_type = "ImageRegion"
+            region = "Photo"
+            region_id = 1
+
+            _uuid = uuid.uuid4()
+            image_reg = page.add_element(region_type, f"region_{_uuid}_{region_id}", region, region_coords)
 
         cv2.imwrite(str(image_path), image)
-
-        page_dir = self.output_dir.joinpath("page")
-
-        if not page_dir.is_dir():
-            self.logger.info(f"Could not find page dir ({page_dir}), creating one at specified location")
-            page_dir.mkdir(parents=True)
-
-        xml_path = image_path_to_xml_path(image_path, check=False)
-
-        page = PageData(xml_path)
-        page.new_page(image_path.name, str(image.shape[0]), str(image.shape[1]))
-
-        region_coords = ""
-        for coords in corners.reshape(-1, 2):
-            region_coords = region_coords + f" {coords[0]},{coords[1]}"
-        region_coords = region_coords.strip()
-
-        region_type = "ImageRegion"
-        region = "Photo"
-        region_id = 1
-
-        _uuid = uuid.uuid4()
-        image_reg = page.add_element("ImageRegion", f"region_{_uuid}_{region_id}", region, region_coords)
-
         page.save_xml()
 
     def process(self):
@@ -250,7 +256,14 @@ class Creator:
         if self.number is None:
             raise TypeError("Cannot run when the number is None")
 
-        items = [(self.random_foreground_path(), self.random_background_path(), i) for i in range(self.number)]
+        items = [
+            (
+                [self.random_foreground_path() for _ in range(np.random.randint(1, self.max_images_per_page))],
+                self.random_background_path(),
+                i,
+            )
+            for i in range(self.number)
+        ]
 
         # Single threaded
         # for image_path in tqdm(image_paths):
@@ -267,6 +280,7 @@ def main(args: argparse.Namespace):
         background_paths=args.background,
         output_dir=args.output,
         number=args.number,
+        max_images_per_page=args.max_images_per_page,
     )
     creator.process()
 
