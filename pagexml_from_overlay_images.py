@@ -31,7 +31,7 @@ def get_arguments() -> argparse.Namespace:
 
     parser.add_argument("-n", "--number", type=int, help="Number of images generated")
 
-    parser.add_argument("--max_images_per_page", type=int, default=1, help="Number of images per page")
+    parser.add_argument("-m", "--max_images_per_page", type=int, default=1, help="Number of images per page")
 
     args = parser.parse_args()
 
@@ -69,6 +69,7 @@ class Creator:
 
         self.max_images_per_page = max_images_per_page
         assert self.max_images_per_page > 0
+        print(self.max_images_per_page)
 
         self.copy = copy
 
@@ -138,7 +139,7 @@ class Creator:
         background_height, background_width = background_image.shape[:2]
 
         max_scale_factor = min([background_height / foreground_height, background_width / foreground_width])
-        scale_factor = np.random.uniform(max_scale_factor * 0.1, max_scale_factor)
+        scale_factor = np.random.uniform(max_scale_factor * 0.1, max_scale_factor * 0.5)
         scaled_foreground_image = cv2.resize(foreground_image, None, fx=scale_factor, fy=scale_factor)
         scaled_foreground_height, scaled_foreground_width = scaled_foreground_image.shape[:2]
 
@@ -209,11 +210,12 @@ class Creator:
             raise TypeError("Cannot run when the output_dir is None")
         foreground_paths, background_path, i = items
         background_image = cv2.imread(str(background_path))
+        image = background_image.copy()
 
         for foreground_path in foreground_paths:
             foreground_image = cv2.imread(str(foreground_path))
 
-            image, corners = self.overlay_images_random_transform(foreground_image, background_image)
+            image, corners = self.overlay_images_random_transform(foreground_image, image)
 
             image_path = self.output_dir.joinpath(f"{i}.jpg")
 
@@ -255,6 +257,8 @@ class Creator:
 
         if self.number is None:
             raise TypeError("Cannot run when the number is None")
+
+        print(np.random.randint(1, self.max_images_per_page))
 
         items = [
             (
