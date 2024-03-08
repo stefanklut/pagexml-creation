@@ -69,7 +69,6 @@ class Creator:
 
         self.max_images_per_page = max_images_per_page
         assert self.max_images_per_page > 0
-        print(self.max_images_per_page)
 
         self.copy = copy
 
@@ -133,39 +132,38 @@ class Creator:
             return False
 
         return True
-    
+
     @staticmethod
     def overlapping_rotated_rectangles(rectangle1: np.ndarray, rectangle2: np.ndarray):
         assert rectangle1.shape == (4, 2)
         assert rectangle2.shape == (4, 2)
-        
+
         def get_vectors(rectangle: np.ndarray):
             vectors = np.zeros((4, 2))
             for i in range(4):
                 vectors[i] = rectangle[(i + 1) % 4] - rectangle[i]
             return vectors
-        
+
         def project_onto_vector(vector, point):
             return np.dot(vector, point) / np.dot(vector, vector) * vector
-        
+
         vectors1 = get_vectors(rectangle1)
         vectors2 = get_vectors(rectangle2)
-        
+
         axis1 = vectors1[0]
         axis2 = vectors1[1]
         axis3 = vectors2[0]
         axis4 = vectors2[1]
-        
+
         for axis in [axis1, axis2, axis3, axis4]:
             projections1 = [project_onto_vector(axis, point) for point in rectangle1]
             projections2 = [project_onto_vector(axis, point) for point in rectangle2]
-            
-            if (
-                np.max([np.min([np.dot(projection, axis) for projection in projections1]) for axis in [axis1, axis2]]) >
-                np.min([np.max([np.dot(projection, axis) for projection in projections2]) for axis in [axis3, axis4]])
+
+            if np.max([np.min([np.dot(projection, axis) for projection in projections1]) for axis in [axis1, axis2]]) > np.min(
+                [np.max([np.dot(projection, axis) for projection in projections2]) for axis in [axis3, axis4]]
             ):
                 return False
-        
+
         return True
 
     def overlay_images_random_transform(self, foreground_image: np.ndarray, background_image: np.ndarray):
@@ -291,8 +289,6 @@ class Creator:
 
         if self.number is None:
             raise TypeError("Cannot run when the number is None")
-
-        print(np.random.randint(1, self.max_images_per_page))
 
         items = [
             (
