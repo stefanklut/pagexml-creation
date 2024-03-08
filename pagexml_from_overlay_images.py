@@ -150,17 +150,19 @@ class Creator:
         vectors1 = get_vectors(rectangle1)
         vectors2 = get_vectors(rectangle2)
 
-        axis1 = vectors1[0]
-        axis2 = vectors1[1]
-        axis3 = vectors2[0]
-        axis4 = vectors2[1]
+        axis1 = vectors1[0] / np.linalg.norm(vectors1[0])
+        axis2 = vectors1[1] / np.linalg.norm(vectors1[1])
+        axis3 = vectors2[0] / np.linalg.norm(vectors2[0])
+        axis4 = vectors2[1] / np.linalg.norm(vectors2[1])
 
         for axis in [axis1, axis2, axis3, axis4]:
             projections1 = [project_onto_vector(axis, point) for point in rectangle1]
             projections2 = [project_onto_vector(axis, point) for point in rectangle2]
 
-            if np.max([np.min([np.dot(projection, axis) for projection in projections1]) for axis in [axis1, axis2]]) > np.min(
-                [np.max([np.dot(projection, axis) for projection in projections2]) for axis in [axis3, axis4]]
+            if max([np.dot(axis, projection) for projection in projections1]) < min(
+                [np.dot(axis, projection) for projection in projections2]
+            ) or max([np.dot(axis, projection) for projection in projections2]) < min(
+                [np.dot(axis, projection) for projection in projections1]
             ):
                 return False
 
