@@ -27,9 +27,9 @@ def get_arguments() -> argparse.Namespace:
     io_args.add_argument(
         "-b", "--background", help="Foreground folder/file", nargs="+", action="extend", type=str, required=True
     )
-    io_args.add_argument("-o", "--output", help="Output folder", type=str)
+    io_args.add_argument("-o", "--output", help="Output folder", type=str, required=True)
 
-    parser.add_argument("-n", "--number", type=int, help="Number of images generated")
+    parser.add_argument("-n", "--number", type=int, help="Number of images generated", required=True)
 
     parser.add_argument("-m", "--max_images_per_page", type=int, default=1, help="Number of images per page")
 
