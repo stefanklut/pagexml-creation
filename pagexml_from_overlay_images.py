@@ -136,9 +136,34 @@ class Creator:
         return True
 
     @staticmethod
+    def ensure_rectangle(points):
+        if points.shape != (4, 2):
+            raise ValueError(f"Expected shape (4, 2), got {points.shape}")
+
+        vector1 = points[1] - points[0]
+        vector2 = points[2] - points[1]
+        vector3 = points[3] - points[2]
+        vector4 = points[0] - points[3]
+
+        angle1 = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+        angle2 = np.dot(vector2, vector3) / (np.linalg.norm(vector2) * np.linalg.norm(vector3))
+        angle3 = np.dot(vector3, vector4) / (np.linalg.norm(vector3) * np.linalg.norm(vector4))
+        angle4 = np.dot(vector4, vector1) / (np.linalg.norm(vector4) * np.linalg.norm(vector1))
+
+        if (
+            not np.isclose(angle1, 0, atol=1e-3)
+            or not np.isclose(angle2, 0, atol=1e-3)
+            or not np.isclose(angle3, 0, atol=1e-3)
+            or not np.isclose(angle4, 0, atol=1e-3)
+        ):
+            raise ValueError(f"Expected a rectangle, got {points}, angles: {angle1}, {angle2}, {angle3}, {angle4}")
+
+        return points
+
+    @staticmethod
     def overlapping_rotated_rectangles(rectangle1: np.ndarray, rectangle2: np.ndarray):
-        assert rectangle1.shape == (4, 2)
-        assert rectangle2.shape == (4, 2)
+        Creator.ensure_rectangle(rectangle1)
+        Creator.ensure_rectangle(rectangle2)
 
         def get_vectors(rectangle: np.ndarray):
             vectors = np.zeros((4, 2))
@@ -208,9 +233,10 @@ class Creator:
                 ),
                 M,
             )
-            corners = corners.squeeze().astype(int)
+            corners = corners.squeeze()
+            rounded_corners = np.round(corners).astype(int)
 
-            if not self.within_rectangle(corners, np.array([(0, 0), (background_width, background_height)])):
+            if not self.within_rectangle(rounded_corners, np.array([(0, 0), (background_width, background_height)])):
                 continue
 
             backup_corners = corners.copy()
@@ -290,7 +316,7 @@ class Creator:
             page.new_page(image_path.name, str(image.shape[0]), str(image.shape[1]))
 
             region_coords = ""
-            for coords in corners.reshape(-1, 2):
+            for coords in np.round(corners).astype(int).reshape(-1, 2):
                 region_coords = region_coords + f" {coords[0]},{coords[1]}"
             region_coords = region_coords.strip()
 
