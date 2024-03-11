@@ -151,10 +151,10 @@ class Creator:
         angle4 = np.dot(vector4, vector1) / (np.linalg.norm(vector4) * np.linalg.norm(vector1))
 
         if (
-            not np.isclose(angle1, 0, atol=1e-3)
-            or not np.isclose(angle2, 0, atol=1e-3)
-            or not np.isclose(angle3, 0, atol=1e-3)
-            or not np.isclose(angle4, 0, atol=1e-3)
+            not np.isclose(angle1, 0, atol=1e-4)
+            or not np.isclose(angle2, 0, atol=1e-4)
+            or not np.isclose(angle3, 0, atol=1e-4)
+            or not np.isclose(angle4, 0, atol=1e-4)
         ):
             raise ValueError(f"Expected a rectangle, got {points}, angles: {angle1}, {angle2}, {angle3}, {angle4}")
 
@@ -295,25 +295,19 @@ class Creator:
         else:
             existing_corners = []
 
+        image_path = self.output_dir.joinpath(f"{i}.jpg")
+
+        page_dir = self.output_dir.joinpath("page")
+        xml_path = image_path_to_xml_path(image_path, check=False)
+        page = PageData(xml_path)
+        page.new_page(image_path.name, str(image.shape[0]), str(image.shape[1]))
+
         for foreground_path in foreground_paths:
             foreground_image = cv2.imread(str(foreground_path))
 
             image, corners = self.overlay_images_random_transform(foreground_image, image, existing_corners)
             if existing_corners is not None:
                 existing_corners.append(corners)
-
-            image_path = self.output_dir.joinpath(f"{i}.jpg")
-
-            page_dir = self.output_dir.joinpath("page")
-
-            if not page_dir.is_dir():
-                self.logger.info(f"Could not find page dir ({page_dir}), creating one at specified location")
-                page_dir.mkdir(parents=True)
-
-            xml_path = image_path_to_xml_path(image_path, check=False)
-
-            page = PageData(xml_path)
-            page.new_page(image_path.name, str(image.shape[0]), str(image.shape[1]))
 
             region_coords = ""
             for coords in np.round(corners).astype(int).reshape(-1, 2):
@@ -326,6 +320,10 @@ class Creator:
 
             _uuid = uuid.uuid4()
             image_reg = page.add_element(region_type, f"region_{_uuid}_{region_id}", region, region_coords)
+
+        if not page_dir.is_dir():
+            self.logger.info(f"Could not find page dir ({page_dir}), creating one at specified location")
+            page_dir.mkdir(parents=True)
 
         cv2.imwrite(str(image_path), image)
         page.save_xml()
