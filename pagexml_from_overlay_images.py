@@ -210,19 +210,24 @@ class Creator:
             )
             corners = corners.squeeze().astype(int)
 
+            if not self.within_rectangle(corners, np.array([(0, 0), (background_width, background_height)])):
+                continue
+
+            backup_corners = corners.copy()
+
             if existing_corners is not None:
                 overlap = False
                 for existing_corners_i in existing_corners:
                     if self.overlapping_rotated_rectangles(existing_corners_i, corners):
                         overlap = True
                         break
-                if overlap:
-                    continue
-
-            if self.within_rectangle(corners, np.array([(0, 0), (background_width, background_height)])):
+                if not overlap:
+                    break
+            else:
                 break
         else:
-            raise ValueError(f"No valid image location found within {max_iters} tries")
+            self.logger.warning(f"Could not find a valid transformation after {max_iters} iterations")
+            corners = backup_corners
 
         image_affine = cv2.warpAffine(scaled_foreground_image, M, (background_width, background_height))
         mask = cv2.warpAffine(np.ones_like(scaled_foreground_image) * 255, M, (background_width, background_height))
