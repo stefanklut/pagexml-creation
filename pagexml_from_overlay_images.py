@@ -33,6 +33,8 @@ def get_arguments() -> argparse.Namespace:
 
     parser.add_argument("-m", "--max_images_per_page", type=int, default=1, help="Number of images per page")
 
+    parser.add_argument("--overlap", action="store_true", help="Allow overlap of images")
+
     args = parser.parse_args()
 
     return args
@@ -46,7 +48,7 @@ class Creator:
         output_dir=None,
         number=None,
         max_images_per_page=1,
-        copy=False,
+        overlap=False,
     ) -> None:
         self.logger = logging.getLogger(get_logger_name())
 
@@ -70,7 +72,7 @@ class Creator:
         self.max_images_per_page = max_images_per_page
         assert self.max_images_per_page > 0
 
-        self.copy = copy
+        self.overlap = overlap
 
     def set_foreground_paths(
         self,
@@ -168,7 +170,9 @@ class Creator:
 
         return True
 
-    def overlay_images_random_transform(self, foreground_image: np.ndarray, background_image: np.ndarray):
+    def overlay_images_random_transform(
+        self, foreground_image: np.ndarray, background_image: np.ndarray, existing_corners=None
+    ):
         foreground_height, foreground_width = foreground_image.shape[:2]
         background_height, background_width = background_image.shape[:2]
 
@@ -205,6 +209,15 @@ class Creator:
                 M,
             )
             corners = corners.squeeze().astype(int)
+
+            if existing_corners is not None:
+                overlap = False
+                for existing_corners_i in existing_corners:
+                    if self.overlapping_rotated_rectangles(existing_corners_i, corners):
+                        overlap = True
+                        break
+                if overlap:
+                    continue
 
             if self.within_rectangle(corners, np.array([(0, 0), (background_width, background_height)])):
                 break
@@ -246,10 +259,17 @@ class Creator:
         background_image = cv2.imread(str(background_path))
         image = background_image.copy()
 
+        if self.overlap:
+            existing_corners = None
+        else:
+            existing_corners = []
+
         for foreground_path in foreground_paths:
             foreground_image = cv2.imread(str(foreground_path))
 
-            image, corners = self.overlay_images_random_transform(foreground_image, image)
+            image, corners = self.overlay_images_random_transform(foreground_image, image, existing_corners)
+            if existing_corners is not None:
+                existing_corners.append(corners)
 
             image_path = self.output_dir.joinpath(f"{i}.jpg")
 
