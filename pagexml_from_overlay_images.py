@@ -261,8 +261,6 @@ class Creator:
         image_result = background_image.copy()
         image_result[np.nonzero(mask)] = image_affine[np.nonzero(mask)]
 
-        output_path = "test.jpg"
-
         return image_result, corners
 
     def random_foreground_path(self):
